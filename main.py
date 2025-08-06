@@ -409,20 +409,18 @@ async def quit_duel(interaction: discord.Interaction):
     try:
         channel = interaction.channel
         message = await channel.fetch_message(duel_a_annuler)
-        if message.embeds:
+        if message:
             embed = message.embeds[0]
             embed.color = discord.Color.red()
             embed.title = "🎲 Nouveau Duel de Dés (Annulé)"
             embed.description = "⚠️ Ce duel a été annulé par son créateur."
             await message.edit(embed=embed, view=None)
-    except (discord.NotFound, discord.Forbidden):
-        # Si le message n'existe plus ou que le bot n'a pas les permissions, on le supprime.
-        try:
-            channel = interaction.channel
-            message = await channel.fetch_message(duel_a_annuler)
-            await message.delete()
-        except (discord.NotFound, discord.Forbidden):
+        else:
+             # Si le message n'existe plus, on ne fait rien
             pass
+    except (discord.NotFound, discord.Forbidden):
+        # Si le message n'existe plus ou que le bot n'a pas les permissions, on ne fait rien.
+        pass
 
     # 6. Envoyer le message de confirmation final.
     await interaction.followup.send("✅ Ton duel a bien été annulé.", ephemeral=True)
