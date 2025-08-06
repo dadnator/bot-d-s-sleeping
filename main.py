@@ -46,7 +46,7 @@ class RejoindreView(discord.ui.View):
 
     @discord.ui.button(label="🎯 Rejoindre le duel", style=discord.ButtonStyle.green)
     async def rejoindre(self, interaction: discord.Interaction, button: discord.ui.Button):
-        message_id = interaction.message.id  # On récupère l'ID du message directement depuis l'interaction
+        message_id = interaction.message.id
         joueur2 = interaction.user
 
         if joueur2.id == self.joueur1.id:
@@ -54,7 +54,7 @@ class RejoindreView(discord.ui.View):
             return
 
         duel_data = duels.get(message_id)
-        if duel_data is None:
+        if not duel_data:
             await interaction.response.send_message("❌ Ce duel n'existe plus ou a déjà été joué.", ephemeral=True)
             return
 
@@ -70,9 +70,10 @@ class RejoindreView(discord.ui.View):
 
         duel_data["joueur2"] = joueur2
         self.rejoindre.disabled = True
-        await interaction.response.defer()
-        original_message = await interaction.channel.fetch_message(message_id)
-
+        
+        # Récupérer l'objet message de l'interaction pour le modifier
+        original_message = interaction.message
+        
         # Mettre à jour l'embed immédiatement après que le joueur 2 a rejoint
         player2_joined_embed = discord.Embed(
             title="🤝 Duel en attente de lancement...",
@@ -84,7 +85,9 @@ class RejoindreView(discord.ui.View):
             color=discord.Color.blue()
         )
         player2_joined_embed.set_footer(text="Préparation du tirage...")
-        await original_message.edit(embed=player2_joined_embed, view=None)
+        
+        # Modifier le message de l'interaction directement
+        await interaction.response.edit_message(embed=player2_joined_embed, view=None)
 
         await asyncio.sleep(5)
 
@@ -106,44 +109,24 @@ class RejoindreView(discord.ui.View):
             gagnant = self.joueur1
         elif resultat2 > resultat1:
             gagnant = joueur2
-        else: # Égalité
-            gagnant = None
-
+        
         result_embed = discord.Embed(
             title="🎲 Résultat du Duel de Dés",
             description="Et le résultat est...",
-            color=discord.Color.green() if gagnant else discord.Color.red() if not gagnant else discord.Color.gold()
+            color=discord.Color.green() if gagnant else discord.Color.gold() if resultat1 == resultat2 else discord.Color.red()
         )
 
-        result_embed.add_field(
-            name=f"🎲 Jet de {self.joueur1.display_name}",
-            value=f"Le dé de {self.joueur1.mention} est tombé sur : **{resultat1}**",
-            inline=False
-        )
-        result_embed.add_field(
-            name=f"🎲 Jet de {joueur2.display_name}",
-            value=f"Le dé de {joueur2.mention} est tombé sur : **{resultat2}**",
-            inline=False
-        )
+        result_embed.add_field(name=f"🎲 Jet de {self.joueur1.display_name}", value=f"Le dé de {self.joueur1.mention} est tombé sur : **{resultat1}**", inline=False)
+        result_embed.add_field(name=f"🎲 Jet de {joueur2.display_name}", value=f"Le dé de {joueur2.mention} est tombé sur : **{resultat2}**", inline=False)
 
         if gagnant:
-            result_embed.add_field(
-                name="**🏆 Gagnant**",
-                value=f"**{gagnant.mention} remporte {2 * self.montant:,}".replace(",", " ") + " kamas 💰**",
-                inline=False
-            )
+            result_embed.add_field(name="**🏆 Gagnant**", value=f"**{gagnant.mention} remporte {2 * self.montant:,}".replace(",", " ") + " kamas 💰**", inline=False)
         else:
-            result_embed.add_field(
-                name="**🤝 Égalité**",
-                value=f"Aucun gagnant ! Les {self.montant:,}".replace(",", " ") + " kamas sont remboursés.",
-                inline=False
-            )
+            result_embed.add_field(name="**🤝 Égalité**", value=f"Aucun gagnant ! Les {self.montant:,}".replace(",", " ") + " kamas sont remboursés.", inline=False)
 
         result_embed.set_footer(text="🎲 Duel terminé • Bonne chance pour le prochain !")
-
         await original_message.edit(embed=result_embed, view=None)
 
-        # Enregistrement du duel dans la base de données si un gagnant existe
         now = datetime.utcnow()
         try:
             c.execute("INSERT INTO paris (joueur1_id, joueur2_id, montant, gagnant_id, date) VALUES (?, ?, ?, ?, ?)",
