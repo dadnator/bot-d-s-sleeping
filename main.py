@@ -383,10 +383,15 @@ async def sleeping(interaction: discord.Interaction, montant: int):
 @bot.tree.command(name="quit", description="Annule le duel en cours que tu as lancé.")
 @is_sleeping()
 async def quit_duel(interaction: discord.Interaction):
+    # 1. Vérifier si la commande est dans le bon salon.
     if interaction.channel.name != "duel-dés-sleeping":
         await interaction.response.send_message("❌ Tu dois utiliser cette commande dans le salon `#duel-dés-sleeping`.", ephemeral=True)
         return
 
+    # 2. Accuser réception de l'interaction pour éviter les erreurs.
+    await interaction.response.defer(ephemeral=True)
+
+    # 3. Trouver le duel à annuler.
     duel_a_annuler = None
     for message_id, duel_data in duels.items():
         if duel_data["joueur1"].id == interaction.user.id:
@@ -394,13 +399,13 @@ async def quit_duel(interaction: discord.Interaction):
             break
 
     if duel_a_annuler is None:
-        await interaction.response.send_message("❌ Tu n'as aucun duel en attente à annuler.", ephemeral=True)
+        await interaction.followup.send("❌ Tu n'as aucun duel en attente à annuler.", ephemeral=True)
         return
 
-    await interaction.response.defer(ephemeral=True)
-
+    # 4. Supprimer le duel de la liste des duels en cours.
     duels.pop(duel_a_annuler)
 
+    # 5. Tenter de modifier le message original pour indiquer que le duel est annulé.
     try:
         channel = interaction.channel
         message = await channel.fetch_message(duel_a_annuler)
@@ -411,8 +416,10 @@ async def quit_duel(interaction: discord.Interaction):
             embed.description = "⚠️ Ce duel a été annulé par son créateur."
             await message.edit(embed=embed, view=None)
     except Exception:
+        # Si le message n'existe plus, on ne fait rien.
         pass
 
+    # 6. Envoyer le message de confirmation final.
     await interaction.followup.send("✅ Ton duel a bien été annulé.", ephemeral=True)
 
 @bot.event
