@@ -8,12 +8,12 @@ import asyncio
 import sqlite3
 from datetime import datetime
 
-
 token = os.environ['TOKEN_BOT_DISCORD']
 
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="/", intents=intents)
 
+# Dictionnaire pour stocker les duels en cours. La clé est l'ID du message du duel.
 duels = {}
 
 # Connexion à la base de données pour les stats
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS paris (
     joueur1_id INTEGER NOT NULL,
     joueur2_id INTEGER NOT NULL,
     montant INTEGER NOT NULL,
-    gagnant_id INTEGER NOT NULL,
+    gagnant_id INTEGER,
     date TIMESTAMP NOT NULL
 )
 """)
@@ -39,21 +39,21 @@ def is_sleeping():
     return app_commands.check(predicate)
 
 class RejoindreView(discord.ui.View):
-    def __init__(self, message_id, joueur1, montant):
+    def __init__(self, joueur1, montant):
         super().__init__(timeout=None)
-        self.message_id = message_id
         self.joueur1 = joueur1
         self.montant = montant
 
     @discord.ui.button(label="🎯 Rejoindre le duel", style=discord.ButtonStyle.green)
     async def rejoindre(self, interaction: discord.Interaction, button: discord.ui.Button):
+        message_id = interaction.message.id  # On récupère l'ID du message directement depuis l'interaction
         joueur2 = interaction.user
 
         if joueur2.id == self.joueur1.id:
             await interaction.response.send_message("❌ Tu ne peux pas rejoindre ton propre duel.", ephemeral=True)
             return
 
-        duel_data = duels.get(self.message_id)
+        duel_data = duels.get(message_id)
         if duel_data is None:
             await interaction.response.send_message("❌ Ce duel n'existe plus ou a déjà été joué.", ephemeral=True)
             return
@@ -71,7 +71,7 @@ class RejoindreView(discord.ui.View):
         duel_data["joueur2"] = joueur2
         self.rejoindre.disabled = True
         await interaction.response.defer()
-        original_message = await interaction.channel.fetch_message(self.message_id)
+        original_message = await interaction.channel.fetch_message(message_id)
 
         # Mettre à jour l'embed immédiatement après que le joueur 2 a rejoint
         player2_joined_embed = discord.Embed(
@@ -144,63 +144,95 @@ class RejoindreView(discord.ui.View):
         await original_message.edit(embed=result_embed, view=None)
 
         # Enregistrement du duel dans la base de données si un gagnant existe
-        if gagnant:
-            now = datetime.utcnow()
-            try:
-                c.execute("INSERT INTO paris (joueur1_id, joueur2_id, montant, gagnant_id, date) VALUES (?, ?, ?, ?, ?)",
-                          (self.joueur1.id, joueur2.id, self.montant, gagnant.id, now))
-                conn.commit()
-            except Exception as e:
-                print("Erreur insertion base:", e)
+        now = datetime.utcnow()
+        try:
+            c.execute("INSERT INTO paris (joueur1_id, joueur2_id, montant, gagnant_id, date) VALUES (?, ?, ?, ?, ?)",
+                      (self.joueur1.id, joueur2.id, self.montant, gagnant.id if gagnant else None, now))
+            conn.commit()
+        except Exception as e:
+            print("Erreur insertion base:", e)
 
-        duels.pop(self.message_id, None)
+        duels.pop(message_id, None)
 
-
-class PariView(discord.ui.View):
-    def __init__(self, interaction, montant):
-        super().__init__(timeout=None)
-        self.interaction = interaction
-        self.montant = montant
-
-@bot.tree.command(name="statsall", description="Affiche les statistiques de tous les duels de dés.")
+@bot.tree.command(name="sleeping", description="Lancer un duel de dés avec un montant.")
 @is_sleeping()
-async def statsall(interaction: discord.Interaction):
-    # Vérifiez si la commande est utilisée dans le bon salon.
-    if not isinstance(interaction.channel, discord.TextChannel) or interaction.channel.name != "duel-dés-sleeping":
-        await interaction.response.send_message(
-            "❌ Cette commande ne peut être utilisée que dans le salon #duel-dés-sleeping.",
-            ephemeral=True
-        )
+@app_commands.describe(montant="Montant misé en kamas")
+async def sleeping(interaction: discord.Interaction, montant: int):
+    if interaction.channel.name != "duel-dés-sleeping":
+        await interaction.response.send_message("❌ Tu dois utiliser cette commande dans le salon `#duel-dés-sleeping`.", ephemeral=True)
         return
 
-    c.execute("""
-    SELECT joueur_id,
-           SUM(montant) as total_mise,
-           SUM(CASE WHEN gagnant_id = joueur_id THEN montant * 2 ELSE 0 END) as kamas_gagnes,
-           SUM(CASE WHEN gagnant_id = joueur_id THEN 1 ELSE 0 END) as victoires,
-           COUNT(*) as total_paris
-    FROM (
-        SELECT joueur1_id as joueur_id, montant, gagnant_id FROM paris
-        UNION ALL
-        SELECT joueur2_id as joueur_id, montant, gagnant_id FROM paris
+    if montant <= 0:
+        await interaction.response.send_message("❌ Le montant doit être supérieur à 0.", ephemeral=True)
+        return
+
+    for duel_data in duels.values():
+        if duel_data["joueur1"].id == interaction.user.id or (
+            "joueur2" in duel_data and duel_data["joueur2"] and duel_data["joueur2"].id == interaction.user.id
+        ):
+            await interaction.response.send_message(
+                "❌ Tu participes déjà à un autre duel. Termine-le ou utilise `/quit` pour l'annuler.",
+                ephemeral=True
+            )
+            return
+
+    embed = discord.Embed(
+        title="🎲 Nouveau Duel de Dés",
+        description=f"{interaction.user.mention} veut lancer un duel pour **{montant:,}".replace(",", " ") + " kamas** 💰",
+        color=discord.Color.gold()
     )
-    GROUP BY joueur_id
-    """)
-    data = c.fetchall()
+    embed.add_field(name="Attente", value="Clique sur le bouton pour rejoindre le duel !", inline=False)
 
-    stats = []
-    for user_id, mises, kamas_gagnes, victoires, total_paris in data:
-        winrate = (victoires / total_paris * 100) if total_paris > 0 else 0.0
-        stats.append((user_id, mises, kamas_gagnes, victoires, winrate, total_paris))
+    rejoindre_view = RejoindreView(joueur1=interaction.user, montant=montant)
 
-    stats.sort(key=lambda x: x[2], reverse=True)
+    role = discord.utils.get(interaction.guild.roles, name="sleeping")
+    message = await interaction.response.send_message(
+        content=f"{role.mention} — Un nouveau duel est prêt !",
+        embed=embed,
+        view=rejoindre_view,
+        allowed_mentions=discord.AllowedMentions(roles=True)
+    )
+    
+    # On ajoute le duel au dictionnaire APRES avoir obtenu l'ID du message
+    duels[message.id] = {
+        "joueur1": interaction.user,
+        "montant": montant,
+    }
 
-    if not stats:
-        await interaction.response.send_message("Aucune donnée statistique disponible.", ephemeral=True)
+@bot.tree.command(name="quit", description="Annule le duel en cours que tu as lancé.")
+@is_sleeping()
+async def quit_duel(interaction: discord.Interaction):
+    if interaction.channel.name != "duel-dés-sleeping":
+        await interaction.response.send_message("❌ Tu dois utiliser cette commande dans le salon `#duel-dés-sleeping`.", ephemeral=True)
         return
 
-    view = StatsView(interaction, stats)
-    await interaction.response.send_message(embed=view.get_embed(), view=view)
+    duel_a_annuler = None
+    for message_id, duel_data in duels.items():
+        if duel_data["joueur1"].id == interaction.user.id:
+            duel_a_annuler = message_id
+            break
+
+    if duel_a_annuler is None:
+        await interaction.response.send_message("❌ Tu n'as aucun duel en attente à annuler.", ephemeral=True)
+        return
+
+    # Envoyer une réponse éphémère pour confirmer l'annulation
+    await interaction.response.send_message("✅ Ton duel a bien été annulé.", ephemeral=True)
+
+    # Supprimer le duel du dictionnaire
+    duels.pop(duel_a_annuler)
+
+    try:
+        channel = interaction.channel
+        message = await channel.fetch_message(duel_a_annuler)
+        if message.embeds:
+            embed = message.embeds[0]
+            embed.color = discord.Color.red()
+            embed.title += " (Annulé)"
+            embed.description = "⚠️ Ce duel a été annulé par son créateur."
+            await message.edit(embed=embed, view=None)
+    except Exception:
+        pass
 
 # --- Commande /mystats : stats personnelles ---
 @bot.tree.command(name="mystats", description="Affiche tes statistiques de duels de dés personnelles.")
@@ -333,106 +365,53 @@ class StatsView(discord.ui.View):
         self.update_buttons()
         await interaction.response.edit_message(embed=self.get_embed(), view=self)
 
-@bot.tree.command(name="sleeping", description="Lancer un duel de dés avec un montant.")
+@bot.tree.command(name="statsall", description="Affiche les statistiques de tous les duels de dés.")
 @is_sleeping()
-@app_commands.describe(montant="Montant misé en kamas")
-async def sleeping(interaction: discord.Interaction, montant: int):
-    if interaction.channel.name != "duel-dés-sleeping":
-        await interaction.response.send_message("❌ Tu dois utiliser cette commande dans le salon `#duel-dés-sleeping`.", ephemeral=True)
+async def statsall(interaction: discord.Interaction):
+    if not isinstance(interaction.channel, discord.TextChannel) or interaction.channel.name != "duel-dés-sleeping":
+        await interaction.response.send_message(
+            "❌ Cette commande ne peut être utilisée que dans le salon #duel-dés-sleeping.",
+            ephemeral=True
+        )
         return
 
-    if montant <= 0:
-        await interaction.response.send_message("❌ Le montant doit être supérieur à 0.", ephemeral=True)
-        return
-
-    for duel_data in duels.values():
-        if duel_data["joueur1"].id == interaction.user.id or (
-            "joueur2" in duel_data and duel_data["joueur2"] and duel_data["joueur2"].id == interaction.user.id
-        ):
-            await interaction.response.send_message(
-                "❌ Tu participes déjà à un autre duel. Termine-le ou utilise `/quit` pour l'annuler.",
-                ephemeral=True
-            )
-            return
-
-    embed = discord.Embed(
-        title="🎲 Nouveau Duel de Dés",
-        description=f"{interaction.user.mention} veut lancer un duel pour **{montant:,}".replace(",", " ") + " kamas** 💰",
-        color=discord.Color.gold()
+    c.execute("""
+    SELECT joueur_id,
+           SUM(montant) as total_mise,
+           SUM(CASE WHEN gagnant_id = joueur_id THEN montant * 2 ELSE 0 END) as kamas_gagnes,
+           SUM(CASE WHEN gagnant_id = joueur_id THEN 1 ELSE 0 END) as victoires,
+           COUNT(*) as total_paris
+    FROM (
+        SELECT joueur1_id as joueur_id, montant, gagnant_id FROM paris
+        UNION ALL
+        SELECT joueur2_id as joueur_id, montant, gagnant_id FROM paris
     )
-    embed.add_field(name="Attente", value="Clique sur le bouton pour rejoindre le duel !", inline=False)
+    GROUP BY joueur_id
+    """)
+    data = c.fetchall()
 
-    rejoindre_view = RejoindreView(message_id=None, joueur1=interaction.user, montant=montant)
+    stats = []
+    for user_id, mises, kamas_gagnes, victoires, total_paris in data:
+        winrate = (victoires / total_paris * 100) if total_paris > 0 else 0.0
+        stats.append((user_id, mises, kamas_gagnes, victoires, winrate, total_paris))
 
-    role = discord.utils.get(interaction.guild.roles, name="sleeping")
-    message = await interaction.response.send_message(
-        content=f"{role.mention} — Un nouveau duel est prêt !",
-        embed=embed,
-        view=rejoindre_view,
-        allowed_mentions=discord.AllowedMentions(roles=True)
-    )
-    
-    rejoindre_view.message_id = message.id
+    stats.sort(key=lambda x: x[2], reverse=True)
 
-    duels[message.id] = {
-        "joueur1": interaction.user,
-        "montant": montant,
-    }
-
-
-@bot.tree.command(name="quit", description="Annule le duel en cours que tu as lancé.")
-@is_sleeping()
-async def quit_duel(interaction: discord.Interaction):
-    # 1. Vérifier si la commande est dans le bon salon.
-    if interaction.channel.name != "duel-dés-sleeping":
-        await interaction.response.send_message("❌ Tu dois utiliser cette commande dans le salon `#duel-dés-sleeping`.", ephemeral=True)
+    if not stats:
+        await interaction.response.send_message("Aucune donnée statistique disponible.", ephemeral=True)
         return
 
-    # 2. Accuser réception de l'interaction pour éviter les erreurs.
-    await interaction.response.defer(ephemeral=True)
-
-    # 3. Trouver le duel à annuler.
-    duel_a_annuler = None
-    for message_id, duel_data in duels.items():
-        if duel_data["joueur1"].id == interaction.user.id and "joueur2" not in duel_data:
-            duel_a_annuler = message_id
-            break
-
-    if duel_a_annuler is None:
-        await interaction.followup.send("❌ Tu n'as aucun duel en attente à annuler.", ephemeral=True)
-        return
-
-    # 4. Supprimer le duel de la liste des duels en cours.
-    duels.pop(duel_a_annuler)
-
-    # 5. Tenter de modifier le message original pour indiquer que le duel est annulé.
-    try:
-        channel = interaction.channel
-        message = await channel.fetch_message(duel_a_annuler)
-        if message:
-            embed = message.embeds[0]
-            embed.color = discord.Color.red()
-            embed.title = "🎲 Nouveau Duel de Dés (Annulé)"
-            embed.description = "⚠️ Ce duel a été annulé par son créateur."
-            await message.edit(embed=embed, view=None)
-        else:
-             # Si le message n'existe plus, on ne fait rien
-            pass
-    except (discord.NotFound, discord.Forbidden):
-        # Si le message n'existe plus ou que le bot n'a pas les permissions, on ne fait rien.
-        pass
-
-    # 6. Envoyer le message de confirmation final.
-    await interaction.followup.send("✅ Ton duel a bien été annulé.", ephemeral=True)
+    view = StatsView(interaction, stats)
+    await interaction.response.send_message(embed=view.get_embed(), view=view)
 
 @bot.event
 async def on_ready():
     print(f"{bot.user} est prêt !")
     try:
-        await bot.tree.sync()
-        print("✅ Commandes synchronisées.")
+        synced = await bot.tree.sync()
+        print(f"✅ Synchronisation réussie de {len(synced)} commande(s).")
     except Exception as e:
-        print(f"Erreur : {e}")
+        print(f"Erreur de synchronisation : {e}")
 
 keep_alive()
 bot.run(token)
