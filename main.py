@@ -115,9 +115,15 @@ class DuelView(discord.ui.View):
         await original_message.edit(embed=result, view=None)
 
         # 🔔 Ensuite, annonce à part la fin du duel (ping)
+       # Juste avant ça :
         role_sleeping = discord.utils.get(interaction.guild.roles, name="sleeping")
-        await original_message.reply(content=f"{role_sleeping.mention} — Le duel est terminé ! Voici les résultats 👇")
 
+        # Et ici tu mets à jour le message AVEC le contenu + embed
+        await original_message.edit(
+            content=f"{role_sleeping.mention} — Le duel est terminé ! Voici les résultats 👇",
+            embed=result,
+            view=None
+        )
 
         duels.pop(self.message_id, None)
 
