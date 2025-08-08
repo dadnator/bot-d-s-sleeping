@@ -83,9 +83,10 @@ class DuelView(discord.ui.View):
         await original_message.edit(embed=suspense)
 
         for i in range(10, 0, -1):
-            suspense.title = f"🎲 Résultat dans {i} seconde{'s' if i > 1 else ''}..."
+            suspense.title = f"🎲 Tirage en cours..."
             await original_message.edit(embed=suspense)
             await asyncio.sleep(1)
+
 
         roll1 = random.randint(1, 6)
         roll2 = random.randint(1, 6)
