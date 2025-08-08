@@ -142,7 +142,7 @@ class StatsView(discord.ui.View):
         self.last_page.disabled = self.page == self.max_page
 
     def get_embed(self):
-        embed = discord.Embed(title="📊 Statistiques Roulette", color=discord.Color.gold())
+        embed = discord.Embed(title="📊 Statistiques duel de dés", color=discord.Color.gold())
         start = self.page * self.entries_per_page
         end = start + self.entries_per_page
         slice_entries = self.entries[start:end]
@@ -196,13 +196,13 @@ class StatsView(discord.ui.View):
         await interaction.response.edit_message(embed=self.get_embed(), view=self)
 
 # --- Commande /statsall : stats à vie ---
-@bot.tree.command(name="statsall", description="Affiche les stats de roulette à vie")
+@bot.tree.command(name="statsall", description="Affiche les stats du duel de dés ")
 @is_sleeping()
 async def statsall(interaction: discord.Interaction):
     # Vérifie si la commande est utilisée dans le bon salon.
-    if not isinstance(interaction.channel, discord.TextChannel) or interaction.channel.name != "roulettesleeping":
+    if not isinstance(interaction.channel, discord.TextChannel) or interaction.channel.name != "duel-dés-sleeping":
         await interaction.response.send_message(
-            "❌ Cette commande ne peut être utilisée que dans le salon #roulettesleeping.",
+            "❌ Cette commande ne peut être utilisée que dans le salon #duel-dés-sleeping.",
             ephemeral=True
         )
         return
@@ -238,7 +238,7 @@ async def statsall(interaction: discord.Interaction):
     await interaction.response.send_message(embed=view.get_embed(), view=view, ephemeral=False)
 
 # --- Commande /mystats : stats personnelles ---
-@bot.tree.command(name="mystats", description="Affiche tes statistiques de roulette personnelles.")
+@bot.tree.command(name="mystats", description="Affiche tes statistiques du duel de dés personnelles.")
 @is_sleeping()
 async def mystats(interaction: discord.Interaction):
     # Récupère l'ID de l'utilisateur qui a lancé la commande
@@ -266,7 +266,7 @@ async def mystats(interaction: discord.Interaction):
     # Si aucune donnée n'est trouvée pour l'utilisateur
     if not stats_data:
         embed = discord.Embed(
-            title="📊 Tes Statistiques Roulette",
+            title="📊 Tes Statistiques duel de dés",
             description="❌ Tu n'as pas encore participé à un duel. Joue ton premier duel pour voir tes stats !",
             color=discord.Color.red()
         )
@@ -280,7 +280,7 @@ async def mystats(interaction: discord.Interaction):
     # Crée un embed pour afficher les statistiques
     embed = discord.Embed(
         title=f"📊 Statistiques de {interaction.user.display_name}",
-        description="Voici un résumé de tes performances à la roulette.",
+        description="Voici un résumé de tes performances au duel de dés.",
         color=discord.Color.gold()
     )
 
@@ -303,13 +303,13 @@ async def mystats(interaction: discord.Interaction):
 
 
 # Commande /sleeping accessible uniquement aux membres avec rôle 'sleeping'
-@bot.tree.command(name="sleeping", description="Lancer un duel roulette avec un montant.")
+@bot.tree.command(name="sleeping", description="Lancer un duel de dés avec un montant.")
 @is_sleeping()
 @app_commands.describe(montant="Montant misé en kamas")
 async def sleeping(interaction: discord.Interaction, montant: int):
-    if interaction.channel.name != "roulettesleeping":
+    if interaction.channel.name != "duel-dés-sleeping":
         await interaction.response.send_message(
-            "❌ Tu dois utiliser cette commande dans le salon `#roulettesleeping`.", ephemeral=True)
+            "❌ Tu dois utiliser cette commande dans le salon `#duel-dés-sleeping`.", ephemeral=True)
         return
 
     if montant <= 0:
@@ -325,7 +325,7 @@ async def sleeping(interaction: discord.Interaction, montant: int):
             return
 
     embed = discord.Embed(
-        title="🎰 Nouveau Duel Roulette",
+        title="🎰 Nouveau Duel De Dés",
         description=f"{interaction.user.mention} veut lancer un duel pour **{montant:,.0f}".replace(",", " ") + " kamas** 💰",
         color=discord.Color.gold())
     embed.add_field(
@@ -349,9 +349,9 @@ async def sleeping(interaction: discord.Interaction, montant: int):
                   description="Annule le duel en cours que tu as lancé.")
 @is_sleeping()
 async def quit_duel(interaction: discord.Interaction):
-    if interaction.channel.name != "roulettesleeping":
+    if interaction.channel.name != "duel-dés-sleeping":
         await interaction.response.send_message(
-            "❌ Tu dois utiliser cette commande dans le salon `#roulettesleeping`.",
+            "❌ Tu dois utiliser cette commande dans le salon `#duel-dés-sleeping`.",
             ephemeral=True)
         return
 
