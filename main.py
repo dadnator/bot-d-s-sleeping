@@ -77,6 +77,9 @@ class DuelView(discord.ui.View):
         embed.add_field(name="👤 Joueur 2", value=f"{joueur2.mention}", inline=True)
         await original_message.edit(embed=embed, view=None)
 
+        # ✅ Attente de 5 secondes pour que les joueurs soient bien visibles
+        await asyncio.sleep(5)
+        
         # Animation de suspense pendant 10 secondes
         suspense = discord.Embed(title="🎲 Lancer des dés en cours...", description="Les dés sont jetés... 🎲", color=discord.Color.greyple())
         suspense.set_image(url="https://images.emojiterra.com/google/noto-emoji/animated-emoji/1f3b2.gif")
