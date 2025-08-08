@@ -351,12 +351,14 @@ async def sleeping(interaction: discord.Interaction, montant: int):
 
     # Envoi le message avec la vue contenant le bouton "Rejoindre le duel"
     role_sleeping = discord.utils.get(interaction.guild.roles, name="sleeping")
-    await interaction.response.send_message(
-    content=f"{role_sleeping.mention} — Un nouveau duel est prêt !",
-    embed=embed,
-    view=view,
-    ephemeral=False
-)
+    await interaction.response.defer()  # Avertit Discord que tu vas répondre plus tard
+
+    await interaction.followup.send(
+        content=f"{role_sleeping.mention} — Un nouveau duel est prêt !",
+        embed=embed,
+        view=view,
+        ephemeral=False
+    )
 
     sent_message = await interaction.original_response()
 
