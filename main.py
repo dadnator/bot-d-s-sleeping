@@ -355,7 +355,8 @@ async def sleeping(interaction: discord.Interaction, montant: int):
     content=f"{role_sleeping.mention} — Un nouveau duel est prêt !",
     embed=embed,
     view=view,
-    ephemeral=False
+    ephemeral=False,
+    allowed_mentions=discord.AllowedMentions(roles=True)
 )
 
     sent_message = await interaction.original_response()
