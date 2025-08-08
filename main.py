@@ -326,22 +326,24 @@ async def sleeping(interaction: discord.Interaction, montant: int):
 
     embed = discord.Embed(
         title="🎰 Nouveau Duel De Dés",
-        description=f"{interaction.user.mention} veut lancer un duel pour **{montant:,.0f}".replace(",", " ") + " kamas** 💰",
-        color=discord.Color.gold())
-    embed.add_field(
-        name="Choix du pari",
-        value="Clique sur un bouton ci-dessous : 🔴 Rouge / ⚫ Noir / 🔵 Pair / 🟣 Impair",
-        inline=False)
-
-    view = PariView(interaction, montant)
-
-
-    await interaction.response.send_message(
-        embed=embed,
-        view=view,
-        ephemeral=True,
-        allowed_mentions=discord.AllowedMentions(roles=True)
+        description=f"{interaction.user.mention} lance un duel pour **{montant:,.0f}".replace(",", " ") + " kamas** 💰\n"
+                    "Clique sur le bouton ci-dessous pour rejoindre !",
+        color=discord.Color.gold()
     )
+
+    # On crée une instance de DuelView sans message_id pour le moment
+    view = DuelView(None, interaction.user, montant)
+
+    # Envoi le message avec la vue contenant le bouton "Rejoindre le duel"
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
+    sent_message = await interaction.original_response()
+
+    # Maintenant qu'on a le message_id, on l'affecte à la vue et au dict des duels
+    view.message_id = sent_message.id
+    duels[sent_message.id] = {"joueur1": interaction.user, "montant": montant, "joueur2": None}
+
+    # Mise à jour du message pour que la vue contienne le bon message_id
+    await sent_message.edit(view=view)
 
 
 # Commande /quit accessible uniquement aux membres avec rôle 'sleeping'
