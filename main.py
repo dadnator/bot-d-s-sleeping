@@ -347,8 +347,7 @@ async def sleeping(interaction: discord.Interaction, montant: int):
 
 
 # Commande /quit accessible uniquement aux membres avec rôle 'sleeping'
-@bot.tree.command(name="quit",
-                  description="Annule le duel en cours que tu as lancé.")
+@bot.tree.command(name="quit", description="Annule le duel en cours que tu as lancé.")
 @is_sleeping()
 async def quit_duel(interaction: discord.Interaction):
     if interaction.channel.name != "duel-dés-sleeping":
@@ -368,7 +367,25 @@ async def quit_duel(interaction: discord.Interaction):
             "❌ Tu n'as aucun duel en attente à annuler.", ephemeral=True)
         return
 
+    # Supprime le duel de la mémoire
     duels.pop(duel_a_annuler)
+
+    # Essayer de modifier le message pour indiquer que le duel est annulé (optionnel)
+    try:
+        channel = interaction.channel
+        message = await channel.fetch_message(duel_a_annuler)
+        embed = discord.Embed(
+            title="❌ Duel annulé",
+            description=f"{interaction.user.mention} a annulé son duel.",
+            color=discord.Color.red()
+        )
+        await message.edit(embed=embed, view=None)
+    except Exception:
+        # En cas d'erreur (message supprimé ou autre), on continue silencieusement
+        pass
+
+    await interaction.response.send_message(
+        "✅ Ton duel a bien été annulé.", ephemeral=True)
 
 
 # --- ACTIVER LE BOT ---
