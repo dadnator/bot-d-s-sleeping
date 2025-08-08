@@ -349,15 +349,15 @@ async def sleeping(interaction: discord.Interaction, montant: int):
     # On crée une instance de DuelView sans message_id pour le moment
     view = DuelView(None, interaction.user, montant)
 
-    # Envoi le message avec la vue contenant le bouton "Rejoindre le duel"
+    # Envoi du message avec mention ping + embed dans le même message
     role_sleeping = discord.utils.get(interaction.guild.roles, name="sleeping")
     await interaction.response.send_message(
-    content=f"{role_sleeping.mention} — Un nouveau duel est prêt !",
-    embed=embed,
-    view=view,
-    ephemeral=False,
-    allowed_mentions=discord.AllowedMentions(roles=True)
-)
+        content=f"<@&{role_sleeping.id}> — Un nouveau duel est prêt !",  # ping forcé
+        embed=embed,
+        view=view,
+        ephemeral=False,
+        allowed_mentions=discord.AllowedMentions(roles=True)  # active le ping
+    )
 
     sent_message = await interaction.original_response()
 
