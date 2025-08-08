@@ -79,7 +79,7 @@ class DuelView(discord.ui.View):
 
         # Animation de suspense pendant 10 secondes
         suspense = discord.Embed(title="🎲 Lancer des dés en cours...", description="Les dés sont jetés... 🎲", color=discord.Color.greyple())
-        suspense.set_image(url="https://i.makeagif.com/media/11-22-2017/gXYMAo.gif")
+        suspense.set_image(url="https://images.emojiterra.com/google/noto-emoji/animated-emoji/1f3b2.gif")
         await original_message.edit(embed=suspense)
 
         for i in range(10, 0, -1):
@@ -109,7 +109,9 @@ class DuelView(discord.ui.View):
         else:
             result.add_field(name="⚖️ Égalité", value="Aucun gagnant, vous récuperer votre mises ", inline=False)
 
-        await original_message.reply(content="@sleeping — Le duel est terminé ! Voici les résultats 👇")
+        role_sleeping = discord.utils.get(interaction.guild.roles, name="sleeping")
+        await original_message.reply(content=f"{role_sleeping.mention} — Le duel est terminé ! Voici les résultats 👇")
+
         duels.pop(self.message_id, None)
 
         now = datetime.utcnow()
@@ -335,7 +337,14 @@ async def sleeping(interaction: discord.Interaction, montant: int):
     view = DuelView(None, interaction.user, montant)
 
     # Envoi le message avec la vue contenant le bouton "Rejoindre le duel"
-    await interaction.response.send_message(content="@sleeping — Un nouveau duel est prêt !", embed=embed, view=view, ephemeral=False)
+    role_sleeping = discord.utils.get(interaction.guild.roles, name="sleeping")
+    await interaction.response.send_message(
+    content=f"{role_sleeping.mention} — Un nouveau duel est prêt !",
+    embed=embed,
+    view=view,
+    ephemeral=False
+)
+
     sent_message = await interaction.original_response()
 
     # Maintenant qu'on a le message_id, on l'affecte à la vue et au dict des duels
