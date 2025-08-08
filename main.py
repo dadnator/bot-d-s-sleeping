@@ -107,10 +107,10 @@ class DuelView(discord.ui.View):
         result.add_field(name=f"{self.joueur1.display_name}", value=f"a lancé : **{roll1}**", inline=True)
         result.add_field(name=f"{joueur2.display_name}", value=f"a lancé : **{roll2}**", inline=True)
         result.add_field(name=" ", value="─" * 20, inline=False)
-        result.add_field(name="💰 Montant misé", value=f"**{self.montant:,.0f}** kamas par joueur", inline=False)
+        result.add_field(name="💰 Montant misé", value=f"**{format(self.montant, ',').replace(',', ' ')}** kamas par joueur", inline=False)
 
         if gagnant:
-            result.add_field(name="🏆 Gagnant", value=f"{gagnant.mention} remporte **{2 * self.montant:,.0f}** kamas !", inline=False)
+            result.add_field(name="🏆 Gagnant", value=f"{gagnant.mention} remporte **{format(2 * self.montant, ',').replace(',', ' ')}** kamas !", inline=False)
         else:
             result.add_field(name="⚖️ Égalité", value="Aucun gagnant, vous récupérez vos mises", inline=False)
 
