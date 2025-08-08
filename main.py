@@ -109,7 +109,7 @@ class DuelView(discord.ui.View):
         else:
             result.add_field(name="⚖️ Égalité", value="Aucun gagnant, vous récuperer votre mises ", inline=False)
 
-        await original_message.edit(embed=result)
+        await original_message.reply(content="@sleeping — Le duel est terminé ! Voici les résultats 👇")
         duels.pop(self.message_id, None)
 
         now = datetime.utcnow()
@@ -335,7 +335,7 @@ async def sleeping(interaction: discord.Interaction, montant: int):
     view = DuelView(None, interaction.user, montant)
 
     # Envoi le message avec la vue contenant le bouton "Rejoindre le duel"
-    await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
+    await interaction.response.send_message(content="@sleeping — Un nouveau duel est prêt !", embed=embed, view=view, ephemeral=False)
     sent_message = await interaction.original_response()
 
     # Maintenant qu'on a le message_id, on l'affecte à la vue et au dict des duels
