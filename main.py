@@ -88,6 +88,7 @@ class DuelView(discord.ui.View):
             await asyncio.sleep(1)
 
 
+        # Lancer les dés après le suspense
         roll1 = random.randint(1, 6)
         roll2 = random.randint(1, 6)
 
@@ -96,22 +97,27 @@ class DuelView(discord.ui.View):
         elif roll2 > roll1:
             gagnant = joueur2
         else:
-            gagnant = None  # égalité
+            gagnant = None
 
+        # Embed du résultat
         result = discord.Embed(title="🎲 Résultat du Duel", color=discord.Color.green())
         result.add_field(name=f"{self.joueur1.display_name}", value=f"a lancé : **{roll1}**", inline=True)
         result.add_field(name=f"{joueur2.display_name}", value=f"a lancé : **{roll2}**", inline=True)
         result.add_field(name=" ", value="─" * 20, inline=False)
-        result.add_field(name="💰 Montant misé", value=f"**{self.montant:,.0f}".replace(",", " ") + " kamas** par joueur ",
-            inline=False)
+        result.add_field(name="💰 Montant misé", value=f"**{self.montant:,.0f}** kamas par joueur", inline=False)
 
         if gagnant:
-            result.add_field(name="🏆 Gagnant", value=f"{gagnant.mention} remporte **{2 * self.montant:,.0f}** kamas !".replace(",", " "), inline=False)
+            result.add_field(name="🏆 Gagnant", value=f"{gagnant.mention} remporte **{2 * self.montant:,.0f}** kamas !", inline=False)
         else:
-            result.add_field(name="⚖️ Égalité", value="Aucun gagnant, vous récuperer votre mises ", inline=False)
+            result.add_field(name="⚖️ Égalité", value="Aucun gagnant, vous récupérez vos mises", inline=False)
 
+        # ⚠️ Met à jour d’abord le message avec l’embed final
+        await original_message.edit(embed=result, view=None)
+
+        # 🔔 Ensuite, annonce à part la fin du duel (ping)
         role_sleeping = discord.utils.get(interaction.guild.roles, name="sleeping")
         await original_message.reply(content=f"{role_sleeping.mention} — Le duel est terminé ! Voici les résultats 👇")
+
 
         duels.pop(self.message_id, None)
 
