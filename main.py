@@ -105,7 +105,7 @@ class DuelView(discord.ui.View):
             inline=False)
 
         if gagnant:
-            result.add_field(name="🏆 Gagnant", value=f"{gagnant.mention} remporte **{2 * self.montant}** kamas !", inline=False)
+            result.add_field(name="🏆 Gagnant", value=f"{gagnant.mention} remporte **{2 * self.montant:,.0f}** kamas !".replace(",", " "), inline=False)
         else:
             result.add_field(name="⚖️ Égalité", value="Aucun gagnant, vous récuperer votre mises ", inline=False)
 
